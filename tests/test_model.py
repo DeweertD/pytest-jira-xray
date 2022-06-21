@@ -8,6 +8,8 @@ import pytest
 from pytest_xray import constant
 from pytest_xray.helper import TestCase as _TestCase, TestExecution as _TestExecution
 
+import src.pytest_xray.plugin
+
 
 @pytest.fixture
 def date_time_now():
@@ -35,7 +37,7 @@ def test_test_execution_output_dictionary(testcase, date_time_now):
     with patch('datetime.datetime') as dt_mock:
         dt_mock.now.return_value = date_time_now
         te = _TestExecution()
-        te.tests = [testcase]
+        te.reports = [testcase]
         assert te.as_dict() == {
             'info': {
                 'finishDate': '2021-04-23T16:30:02+0000',
@@ -55,7 +57,7 @@ def test_test_execution_output_dictionary_with_test_plan_id(testcase, date_time_
     with patch('datetime.datetime') as dt_mock:
         dt_mock.now.return_value = date_time_now
         te = _TestExecution(test_plan_key='Jira-10')
-        te.tests = [testcase]
+        te.reports = [testcase]
         assert te.as_dict() == {
             'info': {
                 'finishDate': '2021-04-23T16:30:02+0000',
@@ -76,7 +78,7 @@ def test_test_execution_output_dictionary_with_test_execution_id(testcase, date_
     with patch('datetime.datetime') as dt_mock:
         dt_mock.now.return_value = date_time_now
         te = _TestExecution(test_plan_key='Jira-10', test_execution_key='JIRA-20')
-        te.tests = [testcase]
+        te.reports = [testcase]
         assert te.as_dict() == {
             'testExecutionKey': 'JIRA-20',
             'info': {
@@ -105,7 +107,7 @@ def test_test_execution_full_model(testcase, date_time_now):
             summary='My Test Suite',
             description='Im doing stuff'
         )
-        te.tests = [testcase]
+        te.reports = [testcase]
         assert te.as_dict() == {
             'testExecutionKey': 'JIRA-20',
             'info': {
@@ -130,8 +132,8 @@ def test_test_execution_full_model(testcase, date_time_now):
 
 
 @mock.patch.dict(os.environ, {
-    constant.ENV_TEST_EXECUTION_FIX_VERSION: '1.1',
-    constant.ENV_TEST_EXECUTION_TEST_ENVIRONMENTS: 'MyLocalLaptop And TheLiveSystem',
+    src.pytest_xray.plugin.ENV_TEST_EXECUTION_FIX_VERSION: '1.1',
+    src.pytest_xray.plugin.ENV_TEST_EXECUTION_TEST_ENVIRONMENTS: 'MyLocalLaptop And TheLiveSystem',
 })
 def test_test_execution_environ_model(testcase, date_time_now):
     with patch('datetime.datetime') as dt_mock:
@@ -140,7 +142,7 @@ def test_test_execution_environ_model(testcase, date_time_now):
             test_plan_key='Jira-10',
             test_execution_key='JIRA-20',
         )
-        te.tests = [testcase]
+        te.reports = [testcase]
         assert te.as_dict() == {
             'testExecutionKey': 'JIRA-20',
             'info': {

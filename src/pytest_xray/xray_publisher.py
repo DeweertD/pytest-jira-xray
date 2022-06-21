@@ -6,7 +6,6 @@ import requests
 from requests.auth import AuthBase
 
 from .constants import AUTHENTICATE_ENDPOINT
-from .exceptions import XrayError
 
 _logger = logging.getLogger(__name__)
 
@@ -54,7 +53,7 @@ class ClientSecretAuth(AuthBase):
         except requests.exceptions.ConnectionError as exc:
             err_message = f'ConnectionError: cannot authenticate with {self.endpoint_url}'
             _logger.exception(err_message)
-            raise XrayError(err_message) from exc
+            raise ValueError(err_message) from exc
         else:
             auth_token = response.text.replace('"', '')
             r.headers['Authorization'] = f'Bearer {auth_token}'
@@ -98,13 +97,17 @@ class XrayPublisher:
         }
         try:
             response = requests.request(
-                method='POST', url=url, headers=headers, json=data,
-                auth=auth, verify=self.verify
+                method='POST',
+                url=url,
+                headers=headers,
+                json=data,
+                auth=auth,
+                verify=self.verify
             )
         except requests.exceptions.ConnectionError as exc:
             err_message = f'ConnectionError: cannot connect to JIRA service at {url}'
             _logger.exception(err_message)
-            raise XrayError(err_message) from exc
+            raise ValueError(err_message) from exc
         else:
             try:
                 response.raise_for_status()
@@ -116,7 +119,7 @@ class XrayPublisher:
                     server_return_error = f"Error message from server: {response.json()['error']}"
                     err_message += '\n' + server_return_error
                     _logger.error(server_return_error)
-                raise XrayError(err_message) from exc
+                raise ValueError(err_message) from exc
             return response.json()
 
     def publish(self, data: dict) -> str:
