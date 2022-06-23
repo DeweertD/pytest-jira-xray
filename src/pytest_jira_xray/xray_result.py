@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
+from _pytest.reports import TestReport
+
 
 @dataclass
 class XrayCustomField:
@@ -109,13 +111,13 @@ class XrayTest:
     comment: Optional[str] = None
     executed_by: Optional[str] = None
     assignee: Optional[str] = None
-    status: Optional[str] = field(default="TODO")
-    steps: Optional[list[XraySteps]] = field(default_factory=list)
-    examples: Optional[list[str]] = field(default_factory=list)
-    iterations: Optional[list[XrayIteration]] = field(default_factory=list)
-    defects: Optional[list[str]] = field(default_factory=list)
-    evidence: Optional[list[XrayEvidence]] = field(default_factory=list)
-    custom_fields: Optional[list[XrayCustomField]] = field(default_factory=list)
+    status: str = field(default="TODO")
+    steps: list[XraySteps] = field(default_factory=list)
+    examples: list[str] = field(default_factory=list)
+    iterations: list[XrayIteration] = field(default_factory=list)
+    defects: list[str] = field(default_factory=list)
+    evidence: list[XrayEvidence] = field(default_factory=list)
+    custom_fields: list[XrayCustomField] = field(default_factory=list)
 
     def add_requirement(self, *requirement_keys):
         for requirement_key in requirement_keys:
@@ -157,6 +159,16 @@ class XrayTest:
         if self.test_key is None and self.test_info.xray_can_match() is False:
             raise ValueError(
                 "No Test Key was specified, and Test Info was not present for automatic test matching or creation")
+
+    def __add__(self, other):
+        if not isinstance(other, XrayTest):
+            raise TypeError("Attempting to add unsupported type to the XrayTest report")
+
+    def __radd__(self, other):
+        if not other:
+            return self
+        if not isinstance(other, XrayTest):
+            raise TypeError(f"Attempting to add {type(other)} to XrayTest")
 
 
 @dataclass

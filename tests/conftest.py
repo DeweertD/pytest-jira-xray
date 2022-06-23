@@ -4,6 +4,12 @@ from _pytest.pytester import Pytester
 pytest_plugins = "pytester"
 
 
+@pytest.fixture(autouse=True)
+def chdir(tmp_path_factory, monkeypatch):
+    base_dir = tmp_path_factory.mktemp('publisher', numbered=True)
+    monkeypatch.chdir(base_dir)
+
+
 @pytest.fixture
 def marked_xray_pass(pytester: Pytester):
     pytester.makepyfile("""

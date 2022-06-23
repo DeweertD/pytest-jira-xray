@@ -3,7 +3,7 @@ from _pytest.pytester import Pytester
 
 
 def test_report_exists(pytester: Pytester, marked_xray_pass):
-    report = pytester.runpytest('--xrayjson=report.json')
+    report = pytester.runpytest('--xrayjson=report.json --execution=JIRA-1')
     assert report.ret is ExitCode.OK
     report.assert_outcomes(passed=1)
     assert not report.errlines
@@ -48,8 +48,8 @@ def test_multiple_ids_fail(xray_tests_multi_fail):
     print(data['tests'])
 
 
-def test_xray_with_all_test_types(testdir):
-    testdir.makepyfile(textwrap.dedent(
+def test_xray_with_all_test_types(pytester):
+    pytester.makepyfile(textwrap.dedent(
         """\
         import pytest
 
@@ -82,9 +82,9 @@ def test_xray_with_all_test_types(testdir):
         def test_xpass():
             pass
         """))
-    report_file = testdir.tmpdir / 'xray.json'
+    report_file = pytester.tmpdir / 'xray.json'
 
-    result = testdir.runpytest(
+    result = pytester.runpytest(
         '--jira-xray',
         f'--xraypath={report_file}',
         '-v',
@@ -121,8 +121,8 @@ def test_non_marked_tests(pytester, anonymous_xray_pass):
     assert hasattr(xray_report['tests'][0]['test_info'], 'test_type')
 
 
-def test_duplicated_ids(testdir):
-    testdir.makepyfile(textwrap.dedent(
+def test_duplicated_ids(pytester):
+    pytester.makepyfile(textwrap.dedent(
         """\
         import pytest
 
@@ -136,9 +136,9 @@ def test_duplicated_ids(testdir):
         """)
     )
 
-    report_file = testdir.tmpdir / 'xray.json'
+    report_file = pytester.tmpdir / 'xray.json'
 
-    result = testdir.runpytest(
+    result = pytester.runpytest(
         '--jira-xray',
         f'--xraypath={report_file}',
         '-v',
@@ -147,7 +147,7 @@ def test_duplicated_ids(testdir):
     assert result.ret == 3
     assert 'Duplicated test case ids' in str(result.stdout)
 
-    result = testdir.runpytest(
+    result = pytester.runpytest(
         '--jira-xray',
         '--allow-duplicate-ids',
         f'--xraypath={report_file}',

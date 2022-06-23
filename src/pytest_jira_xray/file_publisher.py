@@ -1,30 +1,34 @@
 import json
-import logging
+import os
 from pathlib import Path
-
-from pytest_jira_xray.exceptions import XrayError
-
-logger = logging.getLogger(__name__)
+from typing import Union
 
 
 class FilePublisher:
 
     def __init__(self, filepath: str):
-        self.filepath: Path = Path(filepath)
+        if filepath is None:
+            return
+        if os.path.split(filepath)[1] == '':
+            raise FileNotFoundError("Provided a path without a trialing file name")
 
-    def publish(self, data: dict) -> str:
+        self._terminal_summary = []
+        self.publish = self._publish
+        self._filepath: Path = Path(filepath).absolute().resolve()
+        self._terminal_summary.append(f"Report File path is {self._filepath}")
+
+    def _publish(self, report_data: Union[dict, list]):
         """
         Save results to a file or raise XrayError.
 
-        :param data: data to save
-        :return: file path where data was saved
+        :param report_data: test report data to be saved in the file
         """
-        self.filepath.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            with open(self.filepath, 'w', encoding='UTF-8') as file:
-                json.dump(data, file, indent=2)
-        except TypeError as e:
-            logger.exception(e)
-            raise XrayError(f'Cannot save data to file: {self.filepath}') from e
-        else:
-            return f'{self.filepath}'
+        if not isinstance(report_data, (list, dict)):
+            raise TypeError("Trying to write report of incorrect type")
+        self._filepath.parents[0].mkdir(parents=True, exist_ok=True)
+        with open(self._filepath, 'w') as report_file:
+            json.dump(report_data, report_file, indent=2)
+            self._terminal_summary.append(f"Report has been successfully written to {self._filepath}")
+
+    def publish(self, report_data: Union[list, dict]):
+        pass  # Do nothing function in case no report file was requested

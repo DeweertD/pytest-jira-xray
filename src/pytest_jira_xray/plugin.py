@@ -22,6 +22,8 @@ from _pytest.config import Config
 from _pytest.config.argparsing import Parser
 from _pytest.fixtures import FixtureRequest
 from _pytest.nodes import Item
+from _pytest.reports import TestReport
+from _pytest.runner import CallInfo
 from _pytest.stash import StashKey
 
 from pytest_jira_xray.xray_report import XrayReport
@@ -48,6 +50,7 @@ xray_key = StashKey['XrayReport']()
 requirement_key = StashKey[list[str]]()
 description_key = StashKey[str]()
 
+
 def pytest_addoption(parser: Parser) -> None:
     xray = parser.getgroup('Jira Xray report')
     xray.addoption(
@@ -68,14 +71,14 @@ def pytest_addoption(parser: Parser) -> None:
         *XRAY_JSON,
         action='store',
         metavar='PATH',
-        default=False,
-        help='Do not upload to a server but create JSON report file at the given path',
+        default=None,
+        help='Create a JSON report file at the given path',
     )
     xray.addoption(
         *JIRA_SERVER,
         action=_URLOrBool,
         metavar='URL',
-        default=False,
+        default=None,
         help='Configure the test results to be automatically uploaded to the provided server URL'
     )
     xray.addoption(
@@ -126,10 +129,25 @@ def pytest_configure(config: Config) -> None:
     if (config.getoption(XRAY_JSON[0], None) is not None
         or config.getoption(JIRA_SERVER[0], None) is not None) \
             and not hasattr(config, 'workerinput'):
-        file_path = config.getoption(XRAY_JSON[0], None)
+        file_path = config.getoption(XRAY_JSON[1], None)
         server_url = config.getoption(JIRA_SERVER[0], None)
-        config.stash[xray_key] = XrayReport(file_path, server_url, config)
+        execution_key = config.getoption(XRAY_EXECUTION_KEY, None)
+        test_plan_key = config.getoption(XRAY_TEST_PLAN_KEY[0], None)
+        api_key = config.getoption(JIRA_API_KEY[0], None)
+        token = config.getoption(JIRA_TOKEN, None)
+        basic_auth = config.getoption(JIRA_BASIC_AUTH[0], None)
+        cloud = config.getoption(JIRA_CLOUD, None)
+        config.stash[xray_key] = XrayReport(file_path, server_url, execution_key, test_plan_key, api_key, token,
+                                            basic_auth, cloud)
         config.pluginmanager.register(plugin=config.stash[xray_key], name='pytest_jira_xray')
+
+
+@pytest.hookimpl(tryfirst=True, hookwrapper=True)
+def pytest_runtest_makereport(item: Item, call: CallInfo):
+    outcome = yield
+    report: TestReport = outcome.get_result()
+    if report.when == "call":
+        print("Hello Report!")
 
 
 def pytest_unconfigure(config: Config) -> None:
