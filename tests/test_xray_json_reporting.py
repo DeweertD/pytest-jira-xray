@@ -1,101 +1,16 @@
-import json
-import textwrap
-
-import pytest
+from _pytest.config import ExitCode
+from _pytest.pytester import Pytester
 
 
-@pytest.fixture()
-def xray_tests(testdir):
-    test_example = textwrap.dedent(
-        """\
-        import pytest 
-        
-        @pytest.mark.xray('JIRA-1')
-        def test_pass():
-            assert True
-        """)  # noqa: W293,W291
-    testdir.makepyfile(test_example)
-    return testdir
+def test_report_exists(pytester: Pytester, marked_xray_pass):
+    report = pytester.runpytest('--xrayjson=report.json')
+    assert report.ret is ExitCode.OK
+    report.assert_outcomes(passed=1)
+    assert not report.errlines
+    assert pytester.path.joinpath('report.json').exists()
 
 
-@pytest.fixture()
-def xray_tests_multi(testdir):
-    test_example = textwrap.dedent(
-        """\
-        import pytest 
-        
-        @pytest.mark.xray(['JIRA-1', 'JIRA-2'])
-        def test_pass():
-            assert True
-        """)  # noqa: W293,W291
-    testdir.makepyfile(test_example)
-    return testdir
-
-
-@pytest.fixture()
-def xray_tests_multi_fail(testdir):
-    test_example = textwrap.dedent(
-        """\
-        import pytest 
-        
-        @pytest.mark.xray(['JIRA-1', 'JIRA-2'])
-        def test_fail():
-            assert 0 == 1 
-        """)  # noqa: W293,W291
-    testdir.makepyfile(test_example)
-    return testdir
-
-
-def test_help_message(xray_tests):
-    result = xray_tests.runpytest(
-        '--help',
-    )
-    result.stdout.fnmatch_lines([
-        'Jira Xray report:',
-        '*--jira-xray*Upload test results to JIRA XRAY*',
-        '*--cloud*Use with JIRA XRAY could server*',
-        '*--api-key-auth*Use API Key authentication*',
-        '*--token-auth*Use token authentication*',
-        '*--client-secret-auth*Use client secret authentication*',
-        '*--execution=ExecutionId*', '*XRAY Test Execution ID*',
-        '*--testplan=TestplanId*', '*XRAY Test Plan ID*',
-        '*--xraypath=path*Do not upload to a server but create JSON report file at*', '*given path*',
-    ])
-
-
-@pytest.mark.parametrize(
-    'cli_options',
-    [
-        ('--jira-xray',),
-        ('--jira-xray', '--cloud', '--client-secret-auth'),
-        ('--jira-xray', '--cloud', '--token-auth'),
-        ('--jira-xray', '--cloud', '--api-key-auth')
-    ],
-    ids=['DC Server', 'Cloud client secret', 'Could token', 'Could api key']
-)
-def test_jira_xray_plugin(xray_tests, cli_options):
-    result = xray_tests.runpytest(*cli_options)
-    result.assert_outcomes(passed=1)
-    result.stdout.fnmatch_lines([
-        '*Uploaded results to JIRA XRAY. Test Execution Id: 1000*',
-    ])
-    assert result.ret == 0
-    assert not result.errlines
-
-
-def test_jira_xray_plugin_exports_to_file(xray_tests):
-    xray_file = xray_tests.tmpdir.join('xray.json')
-    result = xray_tests.runpytest('--jira-xray', '--xraypath', str(xray_file))
-    result.assert_outcomes(passed=1)
-    result.stdout.fnmatch_lines([
-        '*Generated XRAY execution report file:*xray.json*',
-    ])
-    assert result.ret == 0
-    assert not result.errlines
-    assert xray_file.exists()
-
-
-def test_jira_xray_plugin_multiple_ids(xray_tests_multi):
+def test_multiple_ids(xray_tests_multi):
     xray_file = xray_tests_multi.tmpdir.join('xray.json')
     result = xray_tests_multi.runpytest('--jira-xray', '--xraypath', str(xray_file))
     result.assert_outcomes(passed=1)
@@ -113,7 +28,7 @@ def test_jira_xray_plugin_multiple_ids(xray_tests_multi):
     assert data['tests'][1]['testKey'] == 'JIRA-2'
 
 
-def test_jira_xray_plugin_multiple_ids_fail(xray_tests_multi_fail):
+def test_multiple_ids_fail(xray_tests_multi_fail):
     xray_file = xray_tests_multi_fail.tmpdir.join('xray.json')
     result = xray_tests_multi_fail.runpytest(
         '--jira-xray',
@@ -192,38 +107,18 @@ def test_xray_with_all_test_types(testdir):
     }
 
 
-def test_if_tests_without_xray_id_are_not_included(testdir):
-    testdir.makepyfile(textwrap.dedent(
-        """\
-        import pytest
-
-        @pytest.mark.xray('JIRA-1')
-        def test_pass():
-            assert True
-
-        def test_pass_without_id():
-            assert True
-        """)
-    )
-
-    report_file = testdir.tmpdir / 'xray.json'
-
-    result = testdir.runpytest(
-        '--jira-xray',
-        f'--xraypath={report_file}',
-        '-v',
-    )
-
-    assert result.ret == 0
-    result.assert_outcomes(passed=2)
-    assert report_file.exists()
-    with open(report_file) as file:
-        data = json.load(file)
-
-    xray_statuses = set((t['testKey'], t['status']) for t in data['tests'])
-    assert xray_statuses == {
-        ('JIRA-1', 'PASS'),
-    }
+def test_non_marked_tests(pytester, anonymous_xray_pass):
+    report = pytester.runpytest('--xrayjson=report.json')
+    assert report.ret is ExitCode.OK
+    report.assert_outcomes(passed=1)
+    with open(pytester.path.joinpath("report.json")) as f:
+        xray_report = json.load(f)
+    assert xray_report is not None
+    assert hasattr(xray_report, 'tests')
+    assert len(xray_report['tests']) == 1
+    assert not hasattr(xray_report['tests'][0], 'test_key')
+    assert hasattr(xray_report['tests'][0], 'test_info')
+    assert hasattr(xray_report['tests'][0]['test_info'], 'test_type')
 
 
 def test_duplicated_ids(testdir):

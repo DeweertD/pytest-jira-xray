@@ -1,8 +1,9 @@
 -r requirements.txt
-flake8==4.0.0
-Flask==2.0.2
-mypy==0.910
+flake8==4.0.1
+Flask==2.1.2
+mypy==0.961
 pytest-cov==3.0.0
 types-flask==1.1.6
-Werkzeug==2.0.2
-setuptools~=60.2.0
+Werkzeug==2.1.2
+setuptools==62.6.0
+jsonschema==4.6.0

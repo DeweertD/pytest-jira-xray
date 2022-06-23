@@ -24,16 +24,16 @@ from _pytest.fixtures import FixtureRequest
 from _pytest.nodes import Item
 from _pytest.stash import StashKey
 
-from .xray_report import XrayReport
-from .xray_result import XrayTest
+from pytest_jira_xray.xray_report import XrayReport
+from pytest_jira_xray.xray_result import XrayTest
 
-XRAY_EXECUTION_KEY = ('--execution')
-XRAY_JSON = ('--xrayjson', '--xray-json')
-XRAY_TEST_PLAN_KEY = ('--testplan', '--test-plan')
-JIRA_API_KEY = ('--apikey', '--api-key')
+XRAY_EXECUTION_KEY = '--execution'
+XRAY_JSON = ['--xrayjson', '--xray-json']
+XRAY_TEST_PLAN_KEY = ['--testplan', '--test-plan']
+JIRA_API_KEY = ['--apikey', '--api-key']
 JIRA_TOKEN = '--token'
-JIRA_CLIENT_SECRET = ('--clientsecret', '--client-secret')
-JIRA_SERVER = ('--serverurl', '--server-url')
+JIRA_BASIC_AUTH = ['--basicauth', '--basic-auth']
+JIRA_SERVER = ['--jiraurl', '--jira-url']
 JIRA_CLOUD = '--cloud'
 ENV_TEST_EXECUTION_TEST_ENVIRONMENTS = 'XRAY_EXECUTION_TEST_ENVIRONMENTS'
 ENV_TEST_EXECUTION_FIX_VERSION = 'XRAY_EXECUTION_FIX_VERSION'
@@ -48,57 +48,62 @@ xray_key = StashKey['XrayReport']()
 requirement_key = StashKey[list[str]]()
 description_key = StashKey[str]()
 
-
 def pytest_addoption(parser: Parser) -> None:
     xray = parser.getgroup('Jira Xray report')
     xray.addoption(
-        *XRAY_EXECUTION_KEY,
+        XRAY_EXECUTION_KEY,
         action='store',
-        metavar='ExecutionId',
+        metavar='EXECUTION_KEY',
         default=None,
         help='Set the XRAY Test Execution Key'
     )
     xray.addoption(
         *XRAY_TEST_PLAN_KEY,
         action='store',
-        metavar='TestPlanId',
+        metavar='TEST_PLAN_KEY',
         default=None,
-        help='XRAY Test Plan Key'
-    )
-    xray.addoption(
-        *JIRA_SERVER,
-        action=_URLOrBool,
-        default=False,
-        help='Upload test results to the self hosted JIRA server through the XRAY results importer endpoint'
-    )
-    xray.addoption(
-        JIRA_CLOUD,
-        action='store_true',
-        help='Set the XRAY results importer endpoint for JIRA Cloud'
+        help='Set the XRAY Test Plan Key'
     )
     xray.addoption(
         *XRAY_JSON,
         action='store',
+        metavar='PATH',
         default=False,
-        help='Store the custom Xray JSON results file in the provided file',
+        help='Do not upload to a server but create JSON report file at the given path',
+    )
+    xray.addoption(
+        *JIRA_SERVER,
+        action=_URLOrBool,
+        metavar='URL',
+        default=False,
+        help='Configure the test results to be automatically uploaded to the provided server URL'
+    )
+    xray.addoption(
+        JIRA_CLOUD,
+        action='store_true',
+        help='Add this option to utilize the Jira Cloud REST API endpoint of /api/v2, otherwise the results are '
+             'uploaded to the /rest/raven/2.0/api endpoint '
     )
     xray.addoption(
         *JIRA_API_KEY,
+        metavar='API_KEY',
         action='store',
         default=False,
-        help='Use API Key authentication',
+        help='Use a user generated API Key for authentication',
     )
     xray.addoption(
         JIRA_TOKEN,
         action='store',
         default=False,
-        help='Use token authentication',
+        help='Use the provided Xray auth token for authentication',
     )
     xray.addoption(
-        *JIRA_CLIENT_SECRET,
+        *JIRA_BASIC_AUTH,
+        metavar='CLIENT_ENCODED',
         action='store',
         default=False,
-        help='Use client secret authentication',
+        help='Use a username and password encoded in the USERNAME:PASSWORD > Base64 format specified by Jira OAuth '
+             '1.0 documentation',
     )
 
 
@@ -124,7 +129,7 @@ def pytest_configure(config: Config) -> None:
         file_path = config.getoption(XRAY_JSON[0], None)
         server_url = config.getoption(JIRA_SERVER[0], None)
         config.stash[xray_key] = XrayReport(file_path, server_url, config)
-        config.pluginmanager.register(plugin=config.stash[xray_key], name='pytest_xray')
+        config.pluginmanager.register(plugin=config.stash[xray_key], name='pytest_jira_xray')
 
 
 def pytest_unconfigure(config: Config) -> None:
@@ -134,32 +139,32 @@ def pytest_unconfigure(config: Config) -> None:
         config.pluginmanager.unregister(xray_report)
 
 
-# def pytest_collection_modifyitems(items: List[Item]) -> None:
-#     for item in items:
-#         item.stash[]
-
-
-# TODO Add fixtures for recording test info properties
-@pytest.fixture
-def record_requirement(request: FixtureRequest) -> Callable[[str], None]:
-    """Add extra requirement links to the calling test.
-    Example::
-        def test_function(record_requirement):
-            record_requirement("example_project-123", "example_project-124", ...)
-    """
-
-    # Declare noop
-    def add_req_noop(*args: str) -> None:
-        pass
-
-    req_func = add_req_noop
-
-    xray = request.config.stash.get(xray_key, None)
-    if xray is not None:
-        test_reporter: XrayTest = xray.test_reporter(request.node.nodeid)
-        req_func = test_reporter.add_requirement
-
-    return req_func
+# # def pytest_collection_modifyitems(items: List[Item]) -> None:
+# #     for item in items:
+# #         item.stash[]
+#
+#
+# # TODO Add fixtures for recording test info properties
+# @pytest.fixture
+# def record_requirement(request: FixtureRequest) -> Callable[[str], None]:
+#     """Add extra requirement links to the calling test.
+#     Example::
+#         def test_function(record_requirement):
+#             record_requirement("example_project-123", "example_project-124", ...)
+#     """
+#
+#     # Declare noop
+#     def add_req_noop(*args: str) -> None:
+#         pass
+#
+#     req_func = add_req_noop
+#
+#     xray = request.config.stash.get(xray_key, None)
+#     if xray is not None:
+#         test_reporter: XrayTest = xray.test_reporter(request.node.nodeid)
+#         req_func = test_reporter.add_requirement
+#
+#     return req_func
 
 
 class _URLOrBool(Action):
@@ -174,8 +179,7 @@ class _URLOrBool(Action):
             setattr(namespace, self.dest, False)
             return
         if values is True or values is None or values.upper() in ("TRUE", "T", ""):
-            setattr(namespace, self.dest, True)
-            return
+            raise ValueError("")
         setattr(namespace, self.dest, str(values))
 
 

@@ -3,9 +3,9 @@ from os import environ
 from typing import List, Dict, Any, Optional
 import re
 
-from pytest_xray.exceptions import XrayError
+from pytest_jira_xray.exceptions import XrayError
 
-from src.pytest_xray.xray_statuses import Status, STATUS_HIERARCHY
+from src.pytest_jira_xray.xray_statuses import Status, STATUS_HIERARCHY
 
 
 # This is the hierarchy of the Status, from bottom to top.

@@ -1,42 +1,92 @@
-import os
-
 import pytest
+from _pytest.pytester import Pytester
 
-from .mock_server import MockServer
-
-pytest_plugins = ['pytester']
-
-
-@pytest.fixture(scope='session')
-def environment_variables():
-    os.environ['XRAY_API_BASE_URL'] = 'http://127.0.0.1:5002'
-    os.environ['XRAY_API_USER'] = 'jirauser'
-    os.environ['XRAY_API_PASSWORD'] = 'jirapassword'
-    os.environ['XRAY_CLIENT_ID'] = 'client_id'
-    os.environ['XRAY_CLIENT_SECRET'] = 'client_secret'
-    os.environ['XRAY_API_TOKEN'] = 'token'
-    os.environ['XRAY_API_KEY'] = 'api_key'
+pytest_plugins = "pytester"
 
 
-@pytest.fixture(scope='session', autouse=True)
-def http_server(environment_variables):
-    server = MockServer(5002)
-    server.add_json_response(
-        '/rest/raven/2.0/import/execution',
-        {'testExecIssue': {'key': '1000'}},
-        methods=('POST',)
-    )
-    # cloud
-    server.add_json_response(
-        '/api/v2/import/execution',
-        {'key': '1000'},
-        methods=('POST',)
-    )
-    server.add_callback_response(
-        '/api/v2/authenticate',
-        lambda: 'token',
-        methods=('POST',)
-    )
-    server.start()
-    yield
-    server.shutdown_server()
+@pytest.fixture
+def marked_xray_pass(pytester: Pytester):
+    pytester.makepyfile("""
+        import pytest
+
+        @pytest.mark.xray('JIRA-1')
+        def test_pass():
+            assert True
+        """)
+
+
+@pytest.fixture
+def marked_xray_expected_exception(pytester: Pytester):
+    pytester.makepyfile("""
+        import pytest
+
+        @pytest.mark.xray('JIRA-4')
+        def test_expected_exception():
+            with pytest.raises(ValueError) as v_error:
+                raise ValueError("This is expected to happen")
+        """)
+
+
+@pytest.fixture
+def marked_xray_expected_fail(pytester: Pytester):
+    pytester.makepyfile("""
+        import pytest
+
+        @pytest.mark.xray('JIRA-3')
+        @pytest.mark.xfail
+        def test_expected_fail():
+            assert False
+        """)
+
+
+@pytest.fixture
+def marked_xray_fail(pytester: Pytester):
+    pytester.makepyfile("""
+        import pytest
+
+        @pytest.mark.xray('JIRA-2')
+        def test_fail():
+            assert False
+        """)
+
+
+@pytest.fixture
+def anonymous_xray_pass(pytester: Pytester):
+    pytester.makepyfile("""
+        import pytest
+
+        def test_pass():
+            assert True
+        """)
+
+
+@pytest.fixture
+def anonymous_xray_expected_exception(pytester: Pytester):
+    pytester.makepyfile("""
+        import pytest
+
+        def test_expected_exception():
+            with pytest.raises(ValueError) as v_error:
+                raise ValueError("This is expected to happen")
+        """)
+
+
+@pytest.fixture
+def anonymous_xray_expected_fail(pytester: Pytester):
+    pytester.makepyfile("""
+        import pytest
+
+        @pytest.mark.xfail
+        def test_expected_fail():
+            assert False
+        """)
+
+
+@pytest.fixture
+def anonymous_xray_fail(pytester: Pytester):
+    pytester.makepyfile("""
+        import pytest
+
+        def test_fail():
+            assert False
+        """)
