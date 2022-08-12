@@ -1,11 +1,7 @@
 import pytest
 
-from pytest_xray.helper import (
-    Status,
-    TestCase as _TestCase,  # to avoid warnings from pytest
-    TestExecution as _TestExecution,
-    STATUS_STR_MAPPER_CLOUD
-)
+from pytest_xray.test_run import Status, STATUS_STR_MAPPER_CLOUD, TestCase as _TestCase
+from pytest_xray.test_execution import TestExecution as _TestExecution
 
 
 @pytest.mark.parametrize(
@@ -22,7 +18,7 @@ def test_testcase_returns_correct_status(status, expected_status):
         status,
         'hello'
     )
-    assert str(test.as_dict()['status']) == expected_status
+    assert str(test.to_dict()['status']) == expected_status
 
 
 @pytest.mark.parametrize(
@@ -40,7 +36,7 @@ def test_status_builder_for_cloud_server_returns_correct_status(status, expected
         'hello',
         status_str_mapper=STATUS_STR_MAPPER_CLOUD,
     )
-    assert str(test.as_dict()['status']) == expected_status
+    assert str(test.to_dict()['status']) == expected_status
 
 
 def test_merge_test_cases():
@@ -62,19 +58,19 @@ def test_merge_test_cases():
         'hi'
     )
 
-    t1.merge(t2)
+    t1 += t2
 
     assert t1.test_key == 'JIRA-1'
     assert t1.status == Status.FAIL
     assert t1.comment == 'hello\n' + '-' * 80 + '\nhi'
 
     with pytest.raises(ValueError):
-        t1.merge(t3)
+        t1 += t3
 
 
 def test_find_test_case():
     execution = _TestExecution()
-    execution.append(
+    execution.add_test_case(
         _TestCase(
             'JIRA-1',
             Status.PASS,
@@ -82,7 +78,7 @@ def test_find_test_case():
         )
     )
 
-    execution.append(
+    execution.add_test_case(
         _TestCase(
             'JIRA-2',
             Status.FAIL,

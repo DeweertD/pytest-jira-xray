@@ -1,5 +1,3 @@
-import datetime as dt
-import enum
 import os
 import re
 from os import environ
@@ -7,13 +5,10 @@ from typing import (
     Any,
     Dict,
     List,
-    Optional,
-    Union
+    Optional
 )
 
-from pytest_xray import constant
 from pytest_xray.constant import (
-    DATETIME_FORMAT,
     ENV_XRAY_API_BASE_URL,
     ENV_XRAY_API_KEY,
     ENV_XRAY_API_PASSWORD,
@@ -26,174 +21,16 @@ from pytest_xray.constant import (
 from pytest_xray.exceptions import XrayError
 
 
-class Status(str, enum.Enum):
-    TODO = 'TODO'
-    EXECUTING = 'EXECUTING'
-    PENDING = 'PENDING'
-    PASS = 'PASS'
-    FAIL = 'FAIL'
-    ABORTED = 'ABORTED'
-    BLOCKED = 'BLOCKED'
-
 
 # This is the hierarchy of the Status, from bottom to top.
 # When merging two statuses, the highest will be picked.
 # For example, a PASS and a FAIL will result in a FAIL,
 # A TODO and an ABORTED in an ABORTED, A TODO and a PASS in a TODO.
-STATUS_HIERARCHY = [
-    Status.PASS,
-    Status.TODO,
-    Status.EXECUTING,
-    Status.PENDING,
-    Status.FAIL,
-    Status.ABORTED,
-    Status.BLOCKED,
-]
 
 # Maps the Status from the internal Status enum to the string representations
 # requested by either the Cloud Jira, or the on-site Jira
-STATUS_STR_MAPPER_CLOUD = {
-    Status.TODO: 'TODO',
-    Status.EXECUTING: 'EXECUTING',
-    Status.PENDING: 'PENDING',
-    Status.PASS: 'PASSED',
-    Status.FAIL: 'FAILED',
-    Status.ABORTED: 'ABORTED',
-    Status.BLOCKED: 'BLOCKED',
-}
 
 # On-site jira uses the enum strings directly
-STATUS_STR_MAPPER_JIRA = {x: x.value for x in Status}
-
-
-class TestCase:
-    def __init__(
-        self,
-        test_key: str,
-        status: Status,
-        comment: Optional[str] = None,
-        status_str_mapper: Dict[Status, str] = None
-    ):
-        self.test_key = test_key
-        self.status = status
-        self.comment = comment or ''
-        if status_str_mapper is None:
-            status_str_mapper = STATUS_STR_MAPPER_JIRA
-        self.status_str_mapper = status_str_mapper
-
-    def merge(self, other: 'TestCase'):
-        """
-        Merges this test case with other, in order to obtain
-        a combined result. Comments will be just appended one after the other.
-        status will be merged according to a priority list.
-        Merge is only possible if the two tests have the same test_key
-        """
-
-        if self.test_key != other.test_key:
-            raise ValueError(
-                f'Cannot merge test with different test keys: '
-                f'{self.test_key} {other.test_key}'
-            )
-
-        if self.comment == '':
-            if other.comment != '':
-                self.comment = other.comment
-        else:
-            if other.comment != '':
-                self.comment += ('\n' + '-'*80 + '\n')
-                self.comment += other.comment
-
-        self.status = _merge_status(self.status, other.status)
-
-    def as_dict(self) -> Dict[str, str]:
-        return dict(
-            testKey=self.test_key,
-            status=self.status_str_mapper[self.status],
-            comment=self.comment,
-        )
-
-
-class TestExecution:
-
-    def __init__(
-        self,
-        test_execution_key: Optional[str] = None,
-        test_plan_key: Optional[str] = None,
-        user: Optional[str] = None,
-        revision: Optional[str] = None,
-        tests: Optional[List[TestCase]] = None,
-        test_environments: Optional[List[str]] = None,
-        fix_version: Optional[str] = None,
-        summary: Optional[str] = None,
-        description: Optional[str] = None,
-    ):
-        self.test_execution_key = test_execution_key
-        self.test_plan_key = test_plan_key or ''
-        self.user = user or ''
-        self.revision = revision or _from_environ_or_none(constant.ENV_TEST_EXECUTION_REVISION)
-        self.start_date = dt.datetime.now(tz=dt.timezone.utc)
-        self.finish_date = None
-        self.tests = tests or []
-        self.test_environments = test_environments or _from_environ(
-            constant.ENV_TEST_EXECUTION_TEST_ENVIRONMENTS,
-            constant.ENV_MULTI_VALUE_SPLIT_PATTERN
-        )
-        self.fix_version = fix_version or _first_from_environ(constant.ENV_TEST_EXECUTION_FIX_VERSION)
-        self.summary = summary or _from_environ_or_none(constant.ENV_TEST_EXECUTION_SUMMARY)
-        self.description = description or _from_environ_or_none(constant.ENV_TEST_EXECUTION_DESC)
-
-    def append(self, test: Union[dict, TestCase]) -> None:
-        if not isinstance(test, TestCase):
-            test = TestCase(**test)
-        self.tests.append(test)
-
-    def find_test_case(self, test_key: str) -> TestCase:
-        """
-        Searches a stored test case by identifier.
-        If not found, raises KeyError
-        """
-        # Linear search, but who cares really of performance here?
-
-        for test in self.tests:
-            if test.test_key == test_key:
-                return test
-
-        raise KeyError(test_key)
-
-    def as_dict(self) -> Dict[str, Any]:
-        if self.finish_date is None:
-            self.finish_date = dt.datetime.now(tz=dt.timezone.utc)  # type: ignore
-
-        tests = [test.as_dict() for test in self.tests]
-        info = dict(
-            startDate=self.start_date.strftime(DATETIME_FORMAT),
-            finishDate=self.finish_date.strftime(DATETIME_FORMAT),  # type: ignore
-        )
-
-        if self.fix_version:
-            info['version'] = self.fix_version
-
-        if self.test_environments and len(self.test_environments) > 0:
-            info['testEnvironments'] = self.test_environments
-
-        if self.summary:
-            info['summary'] = self.summary
-
-        if self.description:
-            info['description'] = self.description
-
-        if self.revision:
-            info['revision'] = self.revision
-
-        data = dict(
-            info=info,
-            tests=tests
-        )
-        if self.test_plan_key:
-            info['testPlanKey'] = self.test_plan_key
-        if self.test_execution_key:
-            data['testExecutionKey'] = self.test_execution_key
-        return data
 
 
 def get_base_options() -> Dict[str, Any]:
@@ -307,10 +144,4 @@ def _from_environ(name: str, separator: str = None) -> List[str]:
     return list(filter(lambda x: len(x) > 0, map(lambda x: x.strip(), source)))
 
 
-def _merge_status(status_1: Status, status_2: Status):
-    """Merges the status of two tests. """
 
-    return STATUS_HIERARCHY[max(
-        STATUS_HIERARCHY.index(status_1),
-        STATUS_HIERARCHY.index(status_2)
-    )]

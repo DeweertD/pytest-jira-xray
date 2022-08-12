@@ -30,15 +30,12 @@ from pytest_xray.constant import (
 from pytest_xray.exceptions import XrayError
 from pytest_xray.file_publisher import FilePublisher
 from pytest_xray.helper import (
-    Status,
-    TestCase,
-    TestExecution,
-    STATUS_STR_MAPPER_JIRA,
-    STATUS_STR_MAPPER_CLOUD,
     get_bearer_auth,
     get_api_key_auth,
     get_basic_auth, get_api_token_auth,
 )
+from pytest_xray.test_run import Status, STATUS_STR_MAPPER_CLOUD, STATUS_STR_MAPPER_JIRA, TestCase
+from pytest_xray.test_execution import TestExecution
 from pytest_xray import hooks
 from pytest_xray.xray_publisher import (
     ClientSecretAuth,
@@ -248,9 +245,9 @@ class XrayPlugin:
             try:
                 test_case = self.test_execution.find_test_case(test_key)
             except KeyError:
-                self.test_execution.append(new_test_case)
+                self.test_execution.add_test_case(new_test_case)
             else:
-                test_case.merge(new_test_case)
+                test_case += new_test_case
 
     def _get_status_from_report(self, report) -> Optional[Status]:
         if report.failed:
@@ -274,7 +271,7 @@ class XrayPlugin:
         self._associate_marker_metadata_for_items(items)
 
     def pytest_sessionfinish(self, session: pytest.Session) -> None:
-        results = self.test_execution.as_dict()
+        results = self.test_execution.to_dict()
         session.config.pluginmanager.hook.pytest_xray_results(
             results=results, session=session
         )
