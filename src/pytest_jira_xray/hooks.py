@@ -1,4 +1,8 @@
-def pytest_xray_execution_key(report):
+import pytest
+
+
+@pytest.hookspec(firstresult=True)
+def pytest_xray_execution_key():
     """Called before adding the Jira execution key to the report"""
 
 
@@ -32,3 +36,8 @@ def pytest_xray_test_plan_key(report):
 
 def pytest_xray_test_environments(report):
     """Called before adding the test environments to the report"""
+
+
+@pytest.hookspec(firstresult=True)
+def pytest_xray_status_mapping(report_outcome, failure_when, wasxfail):
+    """Called before setting the test status, can be used to set custom statuses"""

@@ -14,20 +14,14 @@
 
 from argparse import Action
 import urllib.parse
-from typing import Callable, List
 
 import pytest
 
 from _pytest.config import Config
 from _pytest.config.argparsing import Parser
-from _pytest.fixtures import FixtureRequest
-from _pytest.nodes import Item
-from _pytest.reports import TestReport
-from _pytest.runner import CallInfo
 from _pytest.stash import StashKey
 
 from pytest_jira_xray.xray_report import XrayReport
-from pytest_jira_xray.xray_result import XrayTest
 
 XRAY_EXECUTION_KEY = '--execution'
 XRAY_JSON = ['--xrayjson', '--xray-json']
@@ -49,6 +43,12 @@ CLOUD_ENDPOINT = '/api/v2/import/execution'
 xray_key = StashKey['XrayReport']()
 requirement_key = StashKey[list[str]]()
 description_key = StashKey[str]()
+
+
+def pytest_addhooks(pluginmanager):
+    from . import hooks
+
+    pluginmanager.add_hookspecs(hooks)
 
 
 def pytest_addoption(parser: Parser) -> None:
@@ -112,7 +112,7 @@ def pytest_addoption(parser: Parser) -> None:
 
 def pytest_configure(config: Config) -> None:
     config.addinivalue_line(
-        'markers', 'xray(ISSUE_KEY): mark test with Jira issue key'
+        'markers', 'xray(*ISSUE_KEY): mark test with Jira issue key'
     )
     config.addinivalue_line(
         'markers', 'requirement(*ISSUE_KEY): Add Jira issue key(s) for requirements which are validated by the marked '
@@ -143,12 +143,21 @@ def pytest_configure(config: Config) -> None:
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
-def pytest_runtest_makereport(item: Item, call: CallInfo):
+def pytest_runtest_makereport(item):
     outcome = yield
-    report: TestReport = outcome.get_result()
-    if report.when == "call":
-        print("Hello Report!")
+    report = outcome.get_result()
+    test_key_markers = item.iter_markers(name="xray")
+    report.test_keys = [test_key for test_key_marker in test_key_markers for test_key in test_key_marker.args]
+    node = item.obj
+    report.description = node.__doc__.strip() if node.__doc__ else node.__name__
 
+
+@pytest.hookimpl(trylast=True)
+def pytest_xray_status_mapping(report_outcome, failure_when, wasxfail):
+    xray_status_map = {
+
+    }
+    return
 
 def pytest_unconfigure(config: Config) -> None:
     xray_report = config.stash.get(xray_key, None)

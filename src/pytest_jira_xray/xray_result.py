@@ -152,7 +152,7 @@ class XrayTest:
         if self.evidence:
             xray_test['evidence'] = [evidence_item.to_json() for evidence_item in self.evidence]
         if self.custom_fields:
-            xray_test['customFields'] = [cf.to_json() for cf in self.custom_fields]
+            xray_test['customFields'] = [custom_field.to_json() for custom_field in self.custom_fields]
         return xray_test
 
     def validate(self) -> None:
