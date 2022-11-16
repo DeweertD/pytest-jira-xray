@@ -1,5 +1,7 @@
 import os
 import re
+import urllib.parse
+from argparse import Action
 from os import environ
 from typing import (
     Any,
@@ -8,7 +10,7 @@ from typing import (
     Optional
 )
 
-from pytest_xray.constant import (
+from pytest_jira_xray.constant import (
     ENV_XRAY_API_BASE_URL,
     ENV_XRAY_API_KEY,
     ENV_XRAY_API_PASSWORD,
@@ -18,7 +20,7 @@ from pytest_xray.constant import (
     ENV_XRAY_CLIENT_ID,
     ENV_XRAY_CLIENT_SECRET
 )
-from pytest_xray.exceptions import XrayError
+from pytest_jira_xray.exceptions import XrayError
 
 
 
@@ -42,7 +44,7 @@ def get_base_options() -> Dict[str, Any]:
             f'pytest-jira-xray plugin requires environment variable: {ENV_XRAY_API_BASE_URL}'
         ) from e
 
-    verify = os.environ.get(ENV_XRAY_API_VERIFY_SSL, 'True')
+    verify = environ.get(ENV_XRAY_API_VERIFY_SSL, 'True')
 
     if verify.upper() == 'TRUE':
         verify = True  # type: ignore
@@ -144,4 +146,27 @@ def _from_environ(name: str, separator: str = None) -> List[str]:
     return list(filter(lambda x: len(x) > 0, map(lambda x: x.strip(), source)))
 
 
+class _URLOrBool(Action):
+    def __init__(self, option_strings, dest, nargs=None, **kwargs):
+        if nargs != '?':
+            raise ValueError("nargs is not ?, this action may not work as intended")
+        super().__init__(option_strings, dest, nargs=nargs, **kwargs)
 
+    def __call__(self, parser, namespace, values, option_string=None):
+        if isinstance(values, bool):
+            setattr(namespace, self.dest, values)
+            return
+        if isinstance(values, str):
+            setattr(namespace, self.dest, self._validate_url(values))
+
+    def _validate_url(self, url):
+        valid_schemes = ("http", "https")
+        url = urllib.parse.urlparse(url)
+        if url.netloc == "":
+            url = urllib.parse.urlparse(f"https://{urllib.parse.urlunparse(url)}")
+        elif url.scheme != "" and url.scheme not in valid_schemes:
+            raise ValueError(
+                f"URL Scheme was not an expected REST compatible scheme, got {url.scheme}, expected one of {valid_schemes}")
+        elif url.scheme == "":
+            url = urllib.parse.urlparse(f"https:{urllib.parse.urlunparse(url)}")
+        return urllib.parse.urlunparse(url)

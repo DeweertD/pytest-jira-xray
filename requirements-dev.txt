@@ -1,8 +1,6 @@
-flake8==4.0.0
-Flask==2.0.2
-mypy==0.910
-pytest==7.0.1
+-r requirements.txt
+flake8~=5.0
+mypy~=0.910
 pytest-cov==3.0.0
-requests==2.25.1
-types-flask==1.1.6
-Werkzeug==2.0.2
+responses~=0.21
+setuptools~=62.6

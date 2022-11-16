@@ -1,16 +1,13 @@
-import datetime
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Optional, List, Union, Dict, Any
 
-from pytest_xray import constant
-from pytest_xray.constant import DATETIME_FORMAT
-from pytest_xray.helper import _from_environ_or_none, _from_environ, _first_from_environ
-from pytest_xray.test_run import TestCase
+from pytest_jira_xray.test_run import XrayTest
 
 
-@dataclass
+@dataclass()
 class TestExecutionInfo:
-    project: Optional[str] = None
+    project: Optional[str] = field(default="")
     summary: Optional[str] = None
     description: Optional[str] = None
     fix_version: Optional[str] = None
@@ -49,18 +46,18 @@ class TestExecutionInfo:
         return self.project is not None
 
 
-@dataclass
+@dataclass()
 class TestExecution:
-    test_execution_key: Optional[str] = None,
-    info: Optional[TestExecutionInfo] = None,
-    tests: Optional[List[TestCase]] = None,
+    test_execution_key: Optional[str] = None
+    info: TestExecutionInfo = TestExecutionInfo()
+    tests: List[XrayTest] = field(default_factory=list)
 
-    def add_test_case(self, test: Union[dict, TestCase]) -> None:
-        if not isinstance(test, TestCase):
-            test = TestCase(**test)
+    def add_test_case(self, test: Union[dict, XrayTest]) -> None:
+        if not isinstance(test, XrayTest):
+            test = XrayTest(**test)
         self.tests.append(test)
 
-    def find_test_case(self, test_key: str) -> TestCase:
+    def find_test_case(self, test_key: str) -> XrayTest:
         """
         Searches a stored test case by identifier.
         If not found, raises KeyError

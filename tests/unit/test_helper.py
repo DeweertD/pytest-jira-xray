@@ -1,7 +1,7 @@
 import pytest
 
-from pytest_xray.test_run import Status, STATUS_STR_MAPPER_CLOUD, TestCase as _TestCase
-from pytest_xray.test_execution import TestExecution as _TestExecution
+from pytest_jira_xray.test_run import Status, STATUS_STR_MAPPER_CLOUD, XrayTest as _TestCase
+from pytest_jira_xray.test_execution import TestExecution as _TestExecution
 
 
 @pytest.mark.parametrize(

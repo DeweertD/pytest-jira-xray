@@ -177,7 +177,7 @@ class XrayTestInfo:
 
 
 @dataclass
-class TestCase:
+class XrayTest:
     test_key: Optional[str] = None
     test_info: Optional[XrayTestInfo] = None
     start: Optional[datetime] = None
@@ -245,10 +245,10 @@ class TestCase:
     def __radd__(self, other):
         if not other:
             return self
-        if not isinstance(other, TestCase):
+        if not isinstance(other, XrayTest):
             raise TypeError(f"Attempting to add {type(other)} to XrayTest")
 
-    def __add__(self, other: 'TestCase') -> 'TestCase':
+    def __add__(self, other: 'XrayTest') -> 'XrayTest':
         """
         Merges this test case with other to obtain a combined result. Comments will be just appended one after the
         other. status will be merged according to a priority list. Merge is only possible if the two tests have the
@@ -257,7 +257,7 @@ class TestCase:
 
         if self is other or other == 0:
             return self
-        if type(other) is not TestCase:
+        if type(other) is not XrayTest:
             raise TypeError("Cannot merge types")
         if self != other:
             raise ValueError(

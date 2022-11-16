@@ -1,18 +1,23 @@
 import json
 import logging
 from pathlib import Path
+from typing import Union
 
-from pytest_xray.exceptions import XrayError
+from pytest_jira_xray.exceptions import XrayError
 
 logger = logging.getLogger(__name__)
 
 
 class FilePublisher:
 
-    def __init__(self, filepath: str):
+    def __init__(self, filepath: Union[str, bool]):
+        if filepath is False:
+            self.publish = self._publish_none
+            return
+        self.publish = self._publish
         self.filepath: Path = Path(filepath)
 
-    def publish(self, data: dict) -> str:
+    def _publish(self, data: dict) -> str:
         """
         Save results to a file or raise XrayError.
 
@@ -26,5 +31,7 @@ class FilePublisher:
         except TypeError as e:
             logger.exception(e)
             raise XrayError(f'Cannot save data to file: {self.filepath}') from e
-        else:
-            return f'{self.filepath}'
+        return f'{self.filepath}'
+
+    def _publish_none(self, data: dict):
+        pass
