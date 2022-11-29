@@ -32,10 +32,13 @@ def test_testcase_output_dictionary(testcase):
         'status': 'PASS'
     }
 
+
 def test_test_execution_output_dictionary_with_test_plan_id(testcase, date_time_now):
     with patch('datetime.datetime') as dt_mock:
         dt_mock.now.return_value = date_time_now
-        te = TestExecution(info=TestExecutionInfo(test_plan_key='Jira-10', start_date=date_time_now, finish_date=date_time_now), tests=[testcase])
+        te = TestExecution(info=TestExecutionInfo(test_plan_key='Jira-10',
+                                                  start_date=date_time_now,
+                                                  finish_date=date_time_now), tests=[testcase])
         te.tests = [testcase]
         assert te.to_dict() == {
             'info': {

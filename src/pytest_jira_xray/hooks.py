@@ -27,12 +27,12 @@ def pytest_xray_project(project_key):
 
 
 @pytest.hookspec(firstresult=True)
-def pytest_xray_summary():
+def pytest_xray_summary(report_summary):
     """Called before setting the summary on the test execution"""
 
 
 @pytest.hookspec(firstresult=True)
-def pytest_xray_description(report_description):
+def pytest_xray_execution_description(description):
     """Called before setting the description on the test execution"""
 
 
@@ -62,5 +62,10 @@ def pytest_xray_test_environments(*test_environments):
 
 
 @pytest.hookspec(firstresult=True)
-def pytest_xray_status_mapping(node_id, report_outcome, failure_when, wasxfail):
+def pytest_xray_status_mapping(is_cloud, node_id, report_outcome, failure_when, wasxfail):
     """Called before setting the test status, can be used to set custom statuses"""
+
+
+@pytest.hookspec(firstresult=True)
+def pytest_xray_test_run_description(report_description):
+    """Called before setting the description on the test run"""

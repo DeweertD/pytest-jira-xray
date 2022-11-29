@@ -7,7 +7,7 @@ from pytest_jira_xray.test_run import XrayTest
 
 @dataclass()
 class TestExecutionInfo:
-    project: Optional[str] = field(default="")
+    project: Optional[str] = None
     summary: Optional[str] = None
     description: Optional[str] = None
     fix_version: Optional[str] = None
@@ -42,8 +42,10 @@ class TestExecutionInfo:
             info['testEnvironments'] = self.test_environments
         return info
 
-    def is_valid(self) -> bool:
-        return self.project is not None
+    def validate(self) -> bool:
+        if self.project or self.test_plan_key:
+            return True
+        raise ValueError("Test Execution Info did not have a Project or a Test Plan Key")
 
 
 @dataclass()
@@ -69,6 +71,15 @@ class TestExecution:
                 return test
 
         raise KeyError(test_key)
+
+    def validate(self) -> bool:
+        if self.test_execution_key:
+            return True
+        if self.info:
+            try:
+                raise ValueError("The Test Execution did not have a Jira Issue Key")
+            except ValueError as e:
+                return self.info.validate()
 
     def to_dict(self) -> Dict[str, Any]:
         json_report = dict(

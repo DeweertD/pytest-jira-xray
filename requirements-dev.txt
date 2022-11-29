@@ -1,6 +1,0 @@
--r requirements.txt
-flake8~=5.0
-mypy~=0.910
-pytest-cov==3.0.0
-responses~=0.21
-setuptools~=62.6

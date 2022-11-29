@@ -1,38 +1,41 @@
+import copy
+from enum import Enum
 from dataclasses import dataclass, field
-import enum
 from datetime import datetime
-from typing import Optional, Dict, Union
+from typing import Optional, Union, Literal
 
 
-class Status(str, enum.Enum):
-    TODO = 'TODO'
-    EXECUTING = 'EXECUTING'
-    PENDING = 'PENDING'
-    PASS = 'PASS'
-    FAIL = 'FAIL'
-    ABORTED = 'ABORTED'
-    BLOCKED = 'BLOCKED'
+class OrderedEnum(str, Enum):
+    def __ge__(self, other):
+        if self.__class__ is other.__class__:
+            return list(self.__class__.__members__.keys()).index(self.name) \
+                   >= list(self.__class__.__members__.keys()).index(other.name)
+        return NotImplemented
+
+    def __gt__(self, other):
+        if self.__class__ is other.__class__:
+            return list(self.__class__.__members__.keys()).index(self.name) \
+                   > list(self.__class__.__members__.keys()).index(other.name)
+        return NotImplemented
+
+    def __le__(self, other):
+        if self.__class__ is other.__class__:
+            return list(self.__class__.__members__.keys()).index(self.name) \
+                   <= list(self.__class__.__members__.keys()).index(other.name)
+        return NotImplemented
+
+    def __lt__(self, other):
+        if self.__class__ is other.__class__:
+            return list(self.__class__.__members__.keys()).index(self.name) \
+                   < list(self.__class__.__members__.keys()).index(other.name)
+        return NotImplemented
 
 
-STATUS_HIERARCHY = [
-    Status.PASS,
-    Status.TODO,
-    Status.EXECUTING,
-    Status.PENDING,
-    Status.FAIL,
-    Status.ABORTED,
-    Status.BLOCKED,
-]
-STATUS_STR_MAPPER_CLOUD = {
-    Status.TODO: 'TODO',
-    Status.EXECUTING: 'EXECUTING',
-    Status.PENDING: 'PENDING',
-    Status.PASS: 'PASSED',
-    Status.FAIL: 'FAILED',
-    Status.ABORTED: 'ABORTED',
-    Status.BLOCKED: 'BLOCKED',
-}
-STATUS_STR_MAPPER_JIRA = {x: x.value for x in Status}
+statuses = ['PASS', 'TODO', 'EXECUTING', 'PENDING', 'FAIL', 'ABORTED', 'BLOCKED']
+cloud_status_values = ['PASSED', 'TODO', 'EXECUTING', 'PENDING', 'FAILED', 'ABORTED', 'BLOCKED']
+
+Status = OrderedEnum("Status", zip(statuses, statuses))
+CloudStatus = OrderedEnum("Status", zip(statuses, cloud_status_values))
 
 
 @dataclass
@@ -93,7 +96,7 @@ class XrayStep:
     data: Optional[str] = None
     result: Optional[str] = None
 
-    def to_json(self):
+    def to_dict(self):
         return dict(
             action=self.action,
             data=self.data,
@@ -106,7 +109,7 @@ class XrayTestInfo:
     project_key: Optional[str] = None
     summary: Optional[str] = None
     description: Optional[str] = None
-    test_type: Optional[str] = None
+    test_type: Optional[Literal['Generic', 'Manual', 'Cucumber']] = field(default='Generic')
     requirement_keys: Optional[list[str]] = field(default_factory=list)
     labels: Optional[list[str]] = field(default_factory=list)
     steps: Optional[list[XrayStep]] = field(default_factory=list)
@@ -114,15 +117,23 @@ class XrayTestInfo:
     scenario: Optional[str] = None
     scenario_type: Optional[list[str]] = field(default_factory=list)
 
-    def __post_init__(self):
-        if self.definition is not None:
-            self.test_type = "Generic"
-        elif self.steps:
-            self.test_type = "Manual"
-        elif self.scenario is not None or self.scenario_type:
-            self.test_type = "Cucumber"
+    def to_cloud_dict(self):
+        test_info = self.to_dict()
+        if self.test_type:
+            test_info['type'] = self.test_type
+        if self.steps:
+            test_info['steps'] = [step.to_cloud_dict() for step in self.steps]
+        return test_info
 
-    def to_json(self):
+    def to_server_dict(self):
+        test_info = self.to_dict()
+        if self.test_type:
+            test_info['testType'] = self.test_type
+        if self.steps:
+            test_info['steps'] = [step.to_server_dict() for step in self.steps]
+        return test_info
+
+    def to_dict(self):
         test_info = {}
         if self.project_key:
             test_info['projectKey'] = self.project_key
@@ -130,14 +141,10 @@ class XrayTestInfo:
             test_info['summary'] = self.summary
         if self.description:
             test_info['description'] = self.description
-        if self.test_type:
-            test_info['testType'] = self.test_type
         if self.requirement_keys:
             test_info['requirementKeys'] = self.requirement_keys
         if self.labels:
             test_info['labels'] = self.labels
-        if self.steps:
-            test_info['steps'] = [step.to_dict() for step in self.steps]
         if self.definition:
             test_info['definition'] = self.definition
         if self.scenario:
@@ -146,34 +153,38 @@ class XrayTestInfo:
             test_info['scenarioType'] = self.scenario_type
         return test_info
 
-    def can_xray_find_match(self) -> bool:
-        return (self.summary is not None
-                and self.test_type in ("Manual", "Cucumber")) \
-               or (self.definition is not None
-                   and self.test_type == "Generic")
-
     def add_requirements(self, *requirement_keys):
         if any(type(requirement_key) != str for requirement_key in requirement_keys):
             raise TypeError(f"A Requirement key was not of type String")
         self.requirement_keys += requirement_keys
 
+    def validate(self) -> bool:
+        if self.__key() is not None:
+            return True
+        raise ValueError("Test Info was not present for automatic test matching or creation")
+
+    def __key(self):
+        if self.test_type in ("Manual", "Cucumber"):
+            return self.test_type, self.summary
+        if self.test_type == "Generic":
+            return self.test_type, self.definition
+
     def __eq__(self, other):
+        if isinstance(other, XrayTestInfo):
+            return self.__key() == other.__key()
+        return NotImplemented
+
+    def __add__(self, other):
         if self.test_type != other.test_type:
-            return False
+            return NotImplemented
         if self.test_type in ("Manual", "Cucumber"):
             return self.summary == other.summary
         if self.test_type == "Generic":
             return self.definition == other.definition
         return False
 
-    def __add__(self, other):
-        if self.test_type != other.test_type:
-            return False
-        if self.test_type in ("Manual", "Cucumber"):
-            return self.summary == other.summary
-        if self.test_type == "Generic":
-            return self.definition == other.definition
-        return False
+    def __hash__(self):
+        return hash(self.__key())
 
 
 @dataclass
@@ -186,24 +197,24 @@ class XrayTest:
     comment: Optional[str] = None
     executed_by: Optional[str] = None
     assignee: Optional[str] = None
+    evidence: list[XrayEvidence] = field(default_factory=list)
 
     # steps: list[XraySteps] = field(default_factory=list)
     # examples: list[str] = field(default_factory=list)
     # iterations: list[XrayIteration] = field(default_factory=list)
     # defects: list[str] = field(default_factory=list)
-    # evidence: list[XrayEvidence] = field(default_factory=list)
     # custom_fields: list[XrayCustomField] = field(default_factory=list)
 
     def add_requirements(self, *requirement_keys):
         self.test_info.add_requirements(*requirement_keys)
 
     def to_dict(self) -> dict:
-        self._validate()
+        self.validate()
         xray_test = dict(status=self.status.__str__())
         if self.test_key:
             xray_test['testKey'] = self.test_key
         if self.test_info:
-            xray_test['testInfo'] = self.test_info.to_json()
+            xray_test['testInfo'] = self.test_info.to_dict()
         if self.start:
             xray_test['start'] = self.start
         if self.finish:
@@ -214,6 +225,8 @@ class XrayTest:
             xray_test['executedBy'] = self.executed_by
         if self.assignee:
             xray_test['assignee'] = self.assignee
+        if self.status:
+            xray_test['status'] = self.status
         # if self.steps:
         #     xray_test['steps'] = [step.to_json() for step in self.steps]
         # if self.examples:
@@ -228,25 +241,16 @@ class XrayTest:
         #     xray_test['customFields'] = [custom_field.to_json() for custom_field in self.custom_fields]
         return xray_test
 
-    def _validate(self) -> None:
-        if not self.test_key and self.test_info.can_xray_find_match() is False:
-            raise ValueError(
-                "No Test Key was specified, and Test Info was not present for automatic test matching or creation")
+    def validate(self) -> bool:
+        if self.test_key and isinstance(self.test_key, str):
+            return True
+        try:
+            raise ValueError("No Test Key was specified")
+        except ValueError as e:
+            return self.test_info.validate()
 
-    @staticmethod
-    def _merge_status(status_1: Status, status_2: Status):
-        """Merges the status of two tests. """
-
-        return STATUS_HIERARCHY[max(
-            STATUS_HIERARCHY.index(status_1),
-            STATUS_HIERARCHY.index(status_2)
-        )]
-
-    def __radd__(self, other):
-        if not other:
-            return self
-        if not isinstance(other, XrayTest):
-            raise TypeError(f"Attempting to add {type(other)} to XrayTest")
+    def __key(self):
+        return (self.test_key, None, None) if self.test_key else (None, self.test_info._XrayTestInfo__key())
 
     def __add__(self, other: 'XrayTest') -> 'XrayTest':
         """
@@ -255,22 +259,36 @@ class XrayTest:
         same identity.
         """
 
-        if self is other or other == 0:
-            return self
-        if type(other) is not XrayTest:
-            raise TypeError("Cannot merge types")
+        if self.__class__ is not other.__class__:
+            raise TypeError("Cannot merge incompatible test types")
         if self != other:
             raise ValueError(
-                f'Cannot merge test with different test keys: '
+                f'Cannot merge two different tests: '
                 f'{self.test_key} {other.test_key}'
             )
-        self.test_info += other.test_info
-        self.comment = '\n'.join((self.comment, other.comment))
-        self.status = _merge_status(self.status, other.status)
+        new_xray_test_values = dict()
+        if self.test_key is not None:
+            new_xray_test_values['test_key'] = self.test_key
+
+        if self.test_info is not None and other.test_info is not None:
+            new_xray_test_values['test_info'] = self.test_info + other.test_info
+        elif self.test_info is not None and other.test_info is None:
+            new_xray_test_values['test_info'] = copy.deepcopy(self.test_info)
+        elif self.test_info is None and other.test_info is not None:
+            new_xray_test_values['test_info'] = copy.deepcopy(other.test_info)
+
+        new_xray_test_values['comment'] = f'{self.comment}\n{"":->80}\n{other.comment}'
+
+        new_xray_test_values['status'] = max(self.status, other.status)
+
+        # TODO Add other values together in new XrayTest object
+
+        return XrayTest(**new_xray_test_values)
 
     def __eq__(self, other):
-        if (self.test_key or other.test_key) and self.test_key == other.test_key:
-            return True
-        if (self.test_info or other.test_info) and self.test_info == other.test_info:
-            return True
-        return False
+        if isinstance(other, XrayTest):
+            return self.__key() == other.__key()
+        return NotImplemented
+
+    def __hash__(self):
+        return hash(self.__key())

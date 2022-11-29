@@ -1,7 +1,7 @@
 import pytest
 
-from pytest_jira_xray.test_run import Status, STATUS_STR_MAPPER_CLOUD, XrayTest as _TestCase
-from pytest_jira_xray.test_execution import TestExecution as _TestExecution
+from pytest_jira_xray.test_run import Status, XrayTest, CloudStatus
+from pytest_jira_xray.test_execution import TestExecution
 
 
 @pytest.mark.parametrize(
@@ -9,87 +9,82 @@ from pytest_jira_xray.test_execution import TestExecution as _TestExecution
     [
         (Status.PASS, 'PASS'),
         (Status.FAIL, 'FAIL'),
-        (Status.ABORTED, 'ABORTED')
+        (Status.ABORTED, 'ABORTED'),
+        (CloudStatus.PASS, 'PASSED'),
+        (CloudStatus.FAIL, 'FAILED'),
+        (CloudStatus.ABORTED, 'ABORTED')
     ]
 )
-def test_testcase_returns_correct_status(status, expected_status):
-    test = _TestCase(
-        'JIRA-1',
-        status,
-        'hello'
+def test_testcase_returns_expected_status(status, expected_status):
+    test = XrayTest(
+        test_key='JIRA-1',
+        status=status,
+        comment='hello'
     )
-    assert str(test.to_dict()['status']) == expected_status
-
-
-@pytest.mark.parametrize(
-    'status, expected_status',
-    [
-        (Status.PASS, 'PASSED'),
-        (Status.FAIL, 'FAILED'),
-        (Status.ABORTED, 'ABORTED')
-    ]
-)
-def test_status_builder_for_cloud_server_returns_correct_status(status, expected_status):
-    test = _TestCase(
-        'JIRA-1',
-        status,
-        'hello',
-        status_str_mapper=STATUS_STR_MAPPER_CLOUD,
-    )
-    assert str(test.to_dict()['status']) == expected_status
+    assert test.to_dict()['status'].value == expected_status
 
 
 def test_merge_test_cases():
-    t1 = _TestCase(
-        'JIRA-1',
-        Status.PASS,
-        'hello'
+    t1 = XrayTest(
+        test_key='JIRA-1',
+        status=Status.PASS,
+        comment='hello'
     )
 
-    t2 = _TestCase(
-        'JIRA-1',
-        Status.FAIL,
-        'hi'
+    t2 = XrayTest(
+        test_key='JIRA-1',
+        status=Status.FAIL,
+        comment='hi'
     )
 
-    t3 = _TestCase(
-        'JIRA-2',
-        Status.FAIL,
-        'hi'
+    t12 = t1 + t2
+    assert t12 is not t1
+    assert t12 is not t2
+
+    assert t12.test_key == 'JIRA-1'
+    assert t12.status == Status.FAIL
+    assert t12.comment == 'hello\n' + '-' * 80 + '\nhi'
+
+
+def test_xray_test_does_not_merge_different_keys():
+    t1 = XrayTest(
+        test_key='JIRA-1',
+        status=Status.PASS,
+        comment='hello'
     )
 
-    t1 += t2
-
-    assert t1.test_key == 'JIRA-1'
-    assert t1.status == Status.FAIL
-    assert t1.comment == 'hello\n' + '-' * 80 + '\nhi'
-
+    t2 = XrayTest(
+        test_key='JIRA-2',
+        status=Status.FAIL,
+        comment='hi'
+    )
     with pytest.raises(ValueError):
-        t1 += t3
+        t3 = t1 + t2
 
 
-def test_find_test_case():
-    execution = _TestExecution()
-    execution.add_test_case(
-        _TestCase(
-            'JIRA-1',
-            Status.PASS,
-            ''
-        )
+def test_find_test_case_works():
+    execution = TestExecution()
+    t1 = XrayTest(
+        test_key='JIRA-1',
+        status=Status.PASS,
+        comment=''
     )
-
-    execution.add_test_case(
-        _TestCase(
-            'JIRA-2',
-            Status.FAIL,
-            'hi'
-        )
+    t2 = XrayTest(
+        test_key='JIRA-2',
+        status=Status.FAIL,
+        comment='hi'
     )
+    execution.add_test_case(t1)
+    execution.add_test_case(t2)
 
-    res = execution.find_test_case('JIRA-2')
+    found = execution.find_test_case('JIRA-1')
+    assert found is t1
 
-    assert res.test_key == 'JIRA-2'
-    assert res.status == Status.FAIL
+    found = execution.find_test_case('JIRA-2')
+    assert found is t2
 
+
+def test_find_test_case_raises_key_error():
+    execution = TestExecution()
     with pytest.raises(KeyError):
         execution.find_test_case('JIRA-42')

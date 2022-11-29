@@ -1,4 +1,5 @@
 import pytest
+from _pytest.config import ExitCode
 from _pytest.pytester import Pytester
 
 import responses
@@ -28,14 +29,18 @@ def make_test_py_file(pytester: Pytester):
 def marked_xray_pass(request, make_test_py_file):
     make_test_py_file(request.fixturename,
                       """
-                          import pytest
-              
-              
-                          @pytest.mark.xray('JIRA-1')
-                          def test_pass():
-                              '''This is a test Doc String'''
-                              assert True
-                          """)
+                      import pytest
+          
+          
+                      @pytest.mark.xray('JIRA-1')
+                      def test_pass():
+                          '''This is a test Doc String'''
+                          assert True
+                      """)
+    return dict(
+        status=dict(passed=1),
+        exit_code=ExitCode.OK,
+        xray_status="PASS")
 
 
 @pytest.fixture
@@ -46,8 +51,13 @@ def marked_xray_fail(request, make_test_py_file):
               
                       @pytest.mark.xray('JIRA-2')
                       def test_fail():
+                          '''This is a test Doc String'''
                           assert False
                       """)
+    return dict(
+        status=dict(failed=1),
+        exit_code=ExitCode.TESTS_FAILED,
+        xray_status="FAIL")
 
 
 @pytest.fixture
@@ -58,8 +68,13 @@ def marked_xray_exception(request, make_test_py_file):
               
                       @pytest.mark.xray('JIRA-3')
                       def test_expected_exception():
+                          '''This is a test Doc String'''
                           raise ValueError("This is not expected to happen")
                       """)
+    return dict(
+        status=dict(failed=1),
+        exit_code=ExitCode.TESTS_FAILED,
+        xray_status="FAIL")
 
 
 @pytest.fixture
@@ -71,8 +86,13 @@ def marked_xray_expected_fail(request, make_test_py_file):
                       @pytest.mark.xray('JIRA-4')
                       @pytest.mark.xfail
                       def test_expected_fail():
+                          '''This is a test Doc String'''
                           assert False
                       """)
+    return dict(
+        status=dict(xfailed=1),
+        exit_code=ExitCode.OK,
+        xray_status="PASS")
 
 
 @pytest.fixture
@@ -83,9 +103,67 @@ def marked_xray_expected_exception(request, make_test_py_file):
               
                       @pytest.mark.xray('JIRA-5')
                       def test_expected_exception():
+                          '''This is a test Doc String'''
                           with pytest.raises(ValueError) as v_error:
                               raise ValueError("This is expected to happen")
                       """)
+    return dict(
+        status=dict(passed=1),
+        exit_code=ExitCode.OK,
+        xray_status="PASS")
+
+
+@pytest.fixture
+def marked_xray_expected_exception_failed(request, make_test_py_file):
+    make_test_py_file(request.fixturename,
+                      """
+                      import pytest
+              
+                      @pytest.mark.xray('JIRA-6')
+                      def test_expected_exception():
+                          '''This is a test Doc String'''
+                          with pytest.raises(ValueError) as v_error:
+                              assert True
+                      """)
+    return dict(
+        status=dict(failed=1),
+        exit_code=ExitCode.TESTS_FAILED,
+        xray_status="FAIL")
+
+
+@pytest.fixture
+def marked_xray_test_error(request, make_test_py_file):
+    make_test_py_file(request.fixturename,
+                      """
+                      import pytest
+              
+                      @pytest.mark.xray('JIRA-7')
+                      def test_error(undefined_fixture):
+                          '''This is a test Doc String'''
+                          assert True
+                      """)
+    return dict(
+        status=dict(errors=1),
+        exit_code=ExitCode.TESTS_FAILED,
+        xray_status="ABORTED")
+
+
+@pytest.fixture
+def marked_xray_test_skipped(request, make_test_py_file):
+    make_test_py_file(request.fixturename,
+                      """
+                      import pytest
+              
+                      @pytest.mark.xray('JIRA-8')
+                      @pytest.mark.skip
+                      def test_skipped():
+                          '''This is a test Doc String'''
+                          assert True
+                      """)
+    return dict(
+        status=dict(skipped=1),
+        exit_code=ExitCode.OK,
+        xray_status='TODO')
 
 
 @pytest.fixture
@@ -95,34 +173,14 @@ def marked_xray_ignore(request, make_test_py_file):
                       import pytest
               
                       @pytest.mark.not_xray
+                      @pytest.mark.xray('JIRA-9')
                       def test_ignored():
+                          '''This is a test Doc String'''
                           assert True
                       """)
-
-
-@pytest.fixture
-def marked_xray_test_error(request, make_test_py_file):
-    make_test_py_file(request.fixturename,
-                      """
-                      import pytest
-              
-                      @pytest.mark.xray('JIRA-6')
-                      def test_error(undefined_fixture):
-                          assert True
-                      """)
-
-
-@pytest.fixture
-def marked_xray_test_skipped(request, make_test_py_file):
-    make_test_py_file(request.fixturename,
-                      """
-                      import pytest
-              
-                      @pytest.mark.xray('JIRA-7')
-                      @pytest.mark.skip
-                      def test_skipped():
-                          assert True
-                      """)
+    return dict(
+        status=dict(passed=1),
+        exit_code=ExitCode.OK)
 
 
 @pytest.fixture
@@ -139,6 +197,196 @@ def marked_xray_test_all():
 
 
 @pytest.fixture
+def duplicate_marked_xray_pass(request, make_test_py_file):
+    make_test_py_file(request.fixturename,
+                      """
+                      import pytest
+
+
+                      @pytest.mark.xray('JIRA-1')
+                      def test_pass():
+                          '''This is a test Doc String'''
+                          assert True
+
+
+                      @pytest.mark.xray('JIRA-1')
+                      def test_pass_2():
+                          '''This is a test Doc String'''
+                          assert True                          
+                      """)
+    return dict(
+        status=dict(passed=2),
+        exit_code=ExitCode.OK,
+        xray_status="PASS")
+
+
+@pytest.fixture
+def duplicate_marked_xray_fail(request, make_test_py_file):
+    make_test_py_file(request.fixturename,
+                      """
+                      import pytest
+
+
+                      @pytest.mark.xray('JIRA-1')
+                      def test_pass():
+                          '''This is a test Doc String'''
+                          assert True
+
+
+                      @pytest.mark.xray('JIRA-1')
+                      def test_fail():
+                          '''This is a test Doc String'''
+                          assert False                          
+                      """)
+    return dict(
+        status=dict(passed=1, failed=1),
+        exit_code=ExitCode.TESTS_FAILED,
+        xray_status="FAIL")
+
+
+
+@pytest.fixture
+def duplicate_marked_xray_exception(request, make_test_py_file):
+    make_test_py_file(request.fixturename,
+                      """
+                      import pytest
+
+
+                      @pytest.mark.xray('JIRA-1')
+                      def test_pass():
+                          '''This is a test Doc String'''
+                          assert True
+
+                      @pytest.mark.xray('JIRA-1')
+                      def test_expected_exception():
+                          '''This is a test Doc String'''
+                          raise ValueError("This is not expected to happen")
+                      """)
+    return dict(
+        status=dict(passed=1, failed=1),
+        exit_code=ExitCode.TESTS_FAILED,
+        xray_status="FAIL")
+
+
+@pytest.fixture
+def duplicate_marked_xray_expected_fail(request, make_test_py_file):
+    make_test_py_file(request.fixturename,
+                      """
+                      import pytest
+
+
+                      @pytest.mark.xray('JIRA-1')
+                      def test_pass():
+                          '''This is a test Doc String'''
+                          assert True
+
+                      @pytest.mark.xray('JIRA-1')
+                      @pytest.mark.xfail
+                      def test_expected_fail():
+                          '''This is a test Doc String'''
+                          assert False
+                      """)
+    return dict(
+        status=dict(passed=1, xfailed=1),
+        exit_code=ExitCode.OK,
+        xray_status="PASS")
+
+
+@pytest.fixture
+def duplicate_marked_xray_expected_exception(request, make_test_py_file):
+    make_test_py_file(request.fixturename,
+                      """
+                      import pytest
+
+
+                      @pytest.mark.xray('JIRA-1')
+                      def test_pass():
+                          '''This is a test Doc String'''
+                          assert True
+
+                      @pytest.mark.xray('JIRA-1')
+                      def test_expected_exception():
+                          '''This is a test Doc String'''
+                          with pytest.raises(ValueError) as v_error:
+                              raise ValueError("This is expected to happen")
+                      """)
+    return dict(
+        status=dict(passed=2),
+        exit_code=ExitCode.OK,
+        xray_status="PASS")
+
+
+@pytest.fixture
+def duplicate_marked_xray_expected_exception_failed(request, make_test_py_file):
+    make_test_py_file(request.fixturename,
+                      """
+                      import pytest
+
+
+                      @pytest.mark.xray('JIRA-1')
+                      def test_pass():
+                          '''This is a test Doc String'''
+                          assert True
+
+                      @pytest.mark.xray('JIRA-1')
+                      def test_expected_exception():
+                          '''This is a test Doc String'''
+                          with pytest.raises(ValueError) as v_error:
+                              assert True
+                      """)
+    return dict(
+        status=dict(passed=1, failed=1),
+        exit_code=ExitCode.TESTS_FAILED,
+        xray_status="FAIL")
+
+
+@pytest.fixture
+def duplicate_marked_xray_test_error(request, make_test_py_file):
+    make_test_py_file(request.fixturename,
+                      """
+                      import pytest
+
+
+                      @pytest.mark.xray('JIRA-1')
+                      def test_pass():
+                          '''This is a test Doc String'''
+                          assert True
+
+                      @pytest.mark.xray('JIRA-1')
+                      def test_error(undefined_fixture):
+                          '''This is a test Doc String'''
+                          assert True
+                      """)
+    return dict(
+        status=dict(passed=1, errors=1),
+        exit_code=ExitCode.TESTS_FAILED,
+        xray_status="ABORTED")
+
+
+@pytest.fixture
+def duplicate_marked_xray_test_skipped(request, make_test_py_file):
+    make_test_py_file(request.fixturename,
+                      """
+                      import pytest
+
+                      @pytest.mark.xray('JIRA-1')
+                      def test_pass():
+                          '''This is a test Doc String'''
+                          assert True
+
+                      @pytest.mark.xray('JIRA-1')
+                      @pytest.mark.skip
+                      def test_skipped():
+                          '''This is a test Doc String'''
+                          assert False
+                      """)
+    return dict(
+        status=dict(passed=1, skipped=1),
+        exit_code=ExitCode.OK,
+        xray_status='TODO')
+
+
+@pytest.fixture
 def anonymous_pass(request, make_test_py_file):
     make_test_py_file(request.fixturename,
                       """
@@ -147,6 +395,10 @@ def anonymous_pass(request, make_test_py_file):
                       def test_pass():
                           assert True
                       """)
+    return dict(
+        status=dict(passed=1),
+        exit_code=ExitCode.OK,
+        xray_status="PASS")
 
 
 @pytest.fixture
@@ -158,6 +410,10 @@ def anonymous_fail(request, make_test_py_file):
                       def test_fail():
                           assert False
                       """)
+    return dict(
+        status=dict(failed=1),
+        exit_code=ExitCode.TESTS_FAILED,
+        xray_status="FAIL")
 
 
 @pytest.fixture
@@ -169,6 +425,10 @@ def anonymous_exception(request, make_test_py_file):
                       def test_expected_exception():
                           raise ValueError("This is not expected to happen")
                       """)
+    return dict(
+        status=dict(failed=1),
+        exit_code=ExitCode.TESTS_FAILED,
+        xray_status="FAIL")
 
 
 @pytest.fixture
@@ -181,6 +441,10 @@ def anonymous_expected_fail(request, make_test_py_file):
                       def test_expected_fail():
                           assert False
                       """)
+    return dict(
+        status=dict(xfailed=1),
+        exit_code=ExitCode.OK,
+        xray_status="PASS")
 
 
 @pytest.fixture
@@ -193,6 +457,26 @@ def anonymous_expected_exception(request, make_test_py_file):
                           with pytest.raises(ValueError) as v_error:
                               raise ValueError("This is expected to happen")
                       """)
+    return dict(
+        status=dict(passed=1),
+        exit_code=ExitCode.OK,
+        xray_status="PASS")
+
+
+@pytest.fixture
+def anonymous_expected_exception_failed(request, make_test_py_file):
+    make_test_py_file(request.fixturename,
+                      """
+                      import pytest
+              
+                      def test_expected_exception():
+                          with pytest.raises(ValueError) as v_error:
+                              assert True
+                      """)
+    return dict(
+        status=dict(failed=1),
+        exit_code=ExitCode.TESTS_FAILED,
+        xray_status="FAIL")
 
 
 @pytest.fixture
@@ -204,6 +488,10 @@ def anonymous_test_error(request, make_test_py_file):
                       def test_expected_exception(undefined_fixture):
                           assert True
                       """)
+    return dict(
+        status=dict(errors=1),
+        exit_code=ExitCode.TESTS_FAILED,
+        xray_status="ABORTED")
 
 
 @pytest.fixture
@@ -216,6 +504,25 @@ def anonymous_test_skipped(request, make_test_py_file):
                       def test_expected_exception(undefined_fixture):
                           assert True
                       """)
+    return dict(
+        status=dict(skipped=1),
+        exit_code=ExitCode.OK,
+        xray_status='TODO')
+
+
+@pytest.fixture
+def anonymous_ignore(request, make_test_py_file):
+    make_test_py_file(request.fixturename,
+                      """
+                      import pytest
+              
+                      @pytest.mark.not_xray
+                      def test_ignored():
+                          assert True
+                      """)
+    return dict(
+        status=dict(passed=1),
+        exit_code=ExitCode.OK)
 
 
 @pytest.fixture

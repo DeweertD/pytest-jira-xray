@@ -33,6 +33,30 @@ or
 Usage
 -----
 
+Creating Jira Xray specific json reports
+
+.. code-block:: bash
+
+    $ pytest --xray-json
+
+Or to specify a file path+name
+
+.. code-block:: bash
+
+    $ pytest --xray-json=path/to/report.json
+
+Uploading results to a Jira server (cloud or self hosted)
+
+.. code-block:: bash
+
+    $ pytest --xray-json
+
+Or to specify a file path+name
+
+.. code-block:: bash
+
+    $ pytest --xray-json=path/to/report.json
+
 Mark a test with JIRA XRAY test ID or list of IDs
 
 .. code-block:: python
@@ -63,7 +87,7 @@ Jira Xray configuration can be provided via Environment Variables:
 
 .. code-block:: bash
 
-    $ export XRAY_API_USER=<jria username>
+    $ export XRAY_API_USER=<jira username>
     $ export XRAY_API_PASSWORD=<user password>
 
 - API KEY (`--api-key-auth` option)
@@ -113,6 +137,150 @@ Or you can provide path to certificate file
     $ export XRAY_EXECUTION_SUMMARY="Smoke tests" # New execution only
     $ export XRAY_EXECUTION_DESC="This is an automated test execution of the smoke tests" # New execution only
 
+If you would prefer to set the Test Execution summary programmatically, then implementing the pytest_xray_summary hook is the way to go. This hook takes one argument *report_summary* which is the value from the command line arguments above. Simply return a string from this hook, and it will be used in the Xray report as the Test Execution summary
+
+* Set the Test Execution summary to a "Smoke tests" without needing the command line argument
+
+.. code-block:: python
+
+    @pytest.hookimpl
+        def pytest_xray_summary(report_summary):
+            return "Smoke tests"
+
+
+Setting the Xray Test Execution Issue Key
++++++++++++++++++++++++++++++++++++++++++
+
+When running auto tests, sometimes it may be desirable to set, update, or overwrite the results of an existing Test Execution. Providing the issue key for the existing Test Execution can be done using one of the following configuration options.
+
+* Use the Command Line Options to set the test execution issue key to "JIRAEX-1":
+
+.. code-block:: bash
+
+    $ pytest --xray-json --execution=JIRAEX-1
+    $ pytest --xray-json --xrayexecution=JIRAEX-1
+    $ pytest --xray-json --xray-execution=JIRAEX-1
+
+If you would prefer to set the Test Execution Key programmatically, then implementing the pytest_xray_execution_key hook is the way to go. This hook takes one argument *execution_key* which is the value from the command line arguments above. Simply return a string from this hook, and it will be used in the Xray report as the Test Execution Key
+
+* Set the Test Execution Key to "JIRAEX-1" without needing the command line argument
+
+.. code-block:: python
+
+    @pytest.hookimpl
+    def pytest_xray_execution_key():
+        return "JIRAEX-1"
+
+* Modify the command line value as desired, or overwrite it with a different key entirely. This results in the Test Execution Key "JIRAEX-2"
+
+.. code-block:: bash
+
+    $ pytest --xray-json --execution=JIRAEX
+
+.. code-block:: python
+
+    @pytest.hookimpl
+    def pytest_xray_execution_key(execution_key):
+        return f"{execution_key}-2"
+
+Read more about Pytest Hooks `here <https://docs.pytest.org/en/7.1.x/how-to/writing_hook_functions.html>`_
+
+Setting the Xray Test Execution's Project Key
++++++++++++++++++++++++++++++++++++++++++++++
+
+When running auto tests, you will usually want to create a new Test Execution for the most recent test results. Providing a project key for the Test Execution allows Xray to automatically create a Test Execution with all the results from the Pytest execution. This can easily be done using one of the following configuration options.
+
+* Use the Command Line Options to set the Project Key to "JIRAEX":
+
+.. code-block:: bash
+
+    $ pytest --xray-json --project-key=JIRAEX
+    $ pytest --xray-json --projectkey=JIRAEX
+    $ pytest --xray-json --project=JIRAEX
+
+If you would prefer to set the Project Key programmatically, then implementing the pytest_xray_project hook is the way to go. This hook takes one argument *project_key* which is the value from the command line arguments above. Simply return a string from this hook, and it will be used in the Xray report as the Test Execution's Project Key, allowing Xray to automatically create the Test Execution in the desired Jira Project.
+
+* Set the Project Key to "JIRAEX" without needing the command line argument
+
+.. code-block:: python
+
+    @pytest.hookimpl
+    def pytest_xray_project(project_key):
+        return "JIRAEX"
+
+* Modify the command line value as desired, or overwrite it with a different key entirely. Running Pytest as shown below results in the Project Key of "JIRA_EX"
+
+.. code-block:: bash
+
+    $ pytest --xray-json --project=JIRA
+
+.. code-block:: python
+
+    @pytest.hookimpl
+    def pytest_xray_project(project_key):
+        return f"{project_key}_EX"
+
+Read more about Pytest Hooks `here <https://docs.pytest.org/en/7.1.x/how-to/writing_hook_functions.html>`_
+
+
+Setting the Xray Test Execution Summary
++++++++++++++++++++++++++++++++++++++++
+
+When running auto tests, setting the test execution summary can be useful in explaining the purpose of the execution
+
+* Use the Command Line Options to set the test execution summary to "smoke tests":
+
+.. code-block:: bash
+
+    $ pytest --xray-json --execution=JIRAEX-1 --execution-summary='smoke tests'
+    $ pytest --xray-json --execution=JIRAEX-1 --executionsummary='smoke tests'
+    $ pytest --xray-json --execution=JIRAEX-1 --summary='smoke tests'
+
+If you would prefer to set the summary programmatically, then implementing the pytest_xray_summary hook is the way to go. This hook takes one argument *execution_summary* which is the value from the command line arguments above. Simply return a string from this hook, and it will be used in the Xray report as the Test Execution summary
+
+* Set the Test Execution summary to "smoke tests" without needing the command line argument
+
+.. code-block:: python
+
+    @pytest.hookimpl
+    def pytest_xray_summary():
+        return "smoke tests"
+
+
+Test Run Status
+++++++++++++++
+
+Xray test run statuses are represented by simple strings, the pytest-jira-xray plugin automatically supports the default statuses from self hosted Jira servers, or Jira Cloud servers. Switching between which status is used is as easy as adding the `--cloud` command line parameter to your pytest run.
+
+* Uses Jira Server defined test run status:
+
+.. code-block:: bash
+
+    $ pytest --xray-json
+
+* Uses Jira Cloud defined test run status:
+
+.. code-block:: bash
+
+    $ pytest --xray-json --cloud
+
+You can also implement your own logic for setting the final test run status by implementing the `pytest_xray_status_mapping` hook. In the simplest case, you only need to return a string from this hook which matches the values from your Jira Server's test run status.
+
+.. note::
+    The pytest-jira-xray plugin supports merging tests with :ref:`Duplicate IDs<Duplicate ID>` into a single result. This is done using the python `max` function.  Therefore, if you use custom IDs or logic for test run statuses, you should utilise the OrderedEnum FunctionalAPI to define a status hierarchy.
+
+* Manually define test run status in the `pytest_xray_status_mapping` hook method, and support merging:
+
+.. code-block:: python
+
+    from pytest-jira-xray.test_run import OrderedEnum
+
+    @pytest.hookimpl
+    def pytest_xray_status_mapping(is_cloud, node_id, report_outcome, failure_when, wasxfail):
+        TestStatus = OrderedEnum("TestStatus", [("TESTPASS", "FUNCTIONAL PASS"),("TESTFAIL", "FUNCTIONAL FAIL")])
+        return TestStatus.TESTPASS if report_outcome == "pass" else TestStatus.TESTFAIL
+
+Read more about Python's Enum Functional API `here <https://docs.python.org/3.9/library/enum.html#functional-api>`_
 
 Upload results
 ++++++++++++++
@@ -177,21 +345,19 @@ Default Jira authentication is basic authentication, but you can select differen
 
     $ pytest --jira-xray --token-auth
 
+.. _Multiple ID:
 
-Multiple ids support
-++++++++++++++++++++
+Multiple ID Support
++++++++++++++++++++
 
-Tests can be marked to handle multiple Jira tests by adding a list, rather than a string. Example:
+Tests can be marked to handle multiple Jira tests by adding multiple issue keys. Example:
 
 .. code-block:: python
 
     # -- FILE: test_example.py
     import pytest
 
-    @pytest.mark.xray([
-        'JIRA-1',
-        'JIRA-2'
-    ])
+    @pytest.mark.xray('JIRA-1', 'JIRA-2')
     def test_my_process():
         assert True
 
@@ -201,7 +367,9 @@ failure comment will contain the same message for both tests.
 This situation can be useful for validation tests or tests that probe multiple
 functionalities in a single run, to reduce execution time.
 
-Duplicated ids support
+.. _Duplicate ID:
+
+Duplicated ID Support
 ++++++++++++++++++++++
 
 By default, the jira-xray plugin does not allow to have multiple tests marked with

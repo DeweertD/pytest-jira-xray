@@ -1,2 +1,8 @@
-requests~=2.0
-pytest~=7.1
+-e .
+flake8~=5.0
+mypy~=0.910
+pytest-cov==3.0.0
+responses~=0.21
+pytest>=7
+requests>=2
+setuptools>=62.6
