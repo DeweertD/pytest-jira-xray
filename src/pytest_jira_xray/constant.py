@@ -6,16 +6,18 @@ TEST_EXECUTION_ENDPOINT_CLOUD = '/api/v2/import/execution'
 AUTHENTICATE_ENDPOINT = '/api/v2/authenticate'
 
 # Pytest command line configuration options
-XRAY_ALLOW_DUPLICATE_IDS = ('--allow-duplicate-ids', '--allow-duplicate-ids')
-XRAY_TEST_PLAN_ID = ('--test-plan', '--testplan')
+XRAY_DUPLICATE_IDS = ('--xray-duplicates', '--xrayduplicates', '--duplicates')
+XRAY_TEST_PLAN_KEY = ('--test-plan', '--testplan')
 XRAY_EXECUTION_KEY = ('--xray-execution', '--xrayexecution', '--execution')
-XRAY_EXECUTION_PROJECT = ('--project-execution', '--projectexecution')
-XRAY_PATH = ('--xray-json', '--xrayjson')
-JIRA_XRAY_FLAG = ('--jira-xray', '--jiraxray')
+XRAY_EXECUTION_PROJECT = ('--project-key', '--projectkey', '--project')
+XRAY_EXECUTION_SUMMARY = ('--execution-summary', '--executionsummary', '--summary')
+XRAY_EXECUTION_DESCRIPTION = ('--description', '--execution-description')
+XRAY_JSON = ('--xray-json', '--xrayjson')
+XRAY_API = ('--xray-api', '--xrayapi')
 JIRA_CLOUD = ('--cloud',)
-JIRA_API_KEY = ('--api-key-auth', '--apikeyauth')
+JIRA_API_KEY = ('--api-key', '--apikey')
 JIRA_TOKEN = ('--token-auth', '--tokenauth')
-JIRA_CLIENT_SECRET_AUTH = ('--client-secret-auth', '--clientsecretauth')
+JIRA_CLIENT_SECRET_AUTH = ('--client-secret', '--clientsecret')
 
 # Custom pytest markers
 XRAY_MARKER = 'xray'
